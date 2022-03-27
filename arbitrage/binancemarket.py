@@ -225,6 +225,11 @@ class BinanceMarket(object):
         response = self.client.get_margin_account()
         self.margin_balances = response['userAssets']
 
+    def update_margin_balances_obj(self):
+        if self.update_margin_balances:
+            self.margin_get_balances()
+            self.update_margin_balances = False
+
 
     def margin_get_balance_with_borrow(self, asset):
         if self.update_margin_balances:
@@ -294,6 +299,28 @@ class BinanceMarket(object):
                 time.sleep(2)
                 return self.spot_buy(asset, amount, price)
             self.update_spot_balances = True
+            self.log.logger.info('cex {} succeed'.format(buy_action))
+
+    def tmp_spot_buy(self, symbol, amount, price):
+        buy_action = 'buy {}, amount {}, price {}'.format(symbol, amount, price)
+        order = None
+        try:
+            order = self.client.create_order(
+                symbol=symbol,
+                side=side,
+                type=self.client.ORDER_TYPE_LIMIT,
+                timeInForce=self.client.TIME_IN_FORCE_GTC,
+                quantity=amount,
+                price=price,
+                timestamp=self._timestamp())
+        except Exception as e:
+            self.log.logger.info('xxxxx--cex buy exception: {}'.format(str(e)))
+            self.log.logger.info('xxxxx--cex buy exception: {}'.format(buy_action))
+        finally:
+            if order is None or "clientOrderId" not in order:
+                self.log.logger.info('spot {}: order is none or clientOrderId not in order'.format(buy_action))
+                time.sleep(1)
+                return self.tmp_spot_buy(symbol, amount, price)
             self.log.logger.info('cex {} succeed'.format(buy_action))
 
     def spot_sell(self, asset, amount, price):

@@ -1,5 +1,5 @@
-assets = ['TRX', 'USDT', 'BTT', 'BTC', 'JST', 'WIN', 'SUN', 'ETH', 'WBTC', 'TUSD', 'USDC']
-spot_assets = ['JST', 'SUN', 'WBTC']
+assets = ['TRX', 'USDT', 'JST', 'WIN', 'SUN', 'TUSD', 'USDJ']
+spot_assets = ['JST', 'SUN']
 
 USDT='TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'
 BTT='TKfjV9RNKJJCqPvBtK8L7Knykh7DNWvnYt'
@@ -25,7 +25,12 @@ TUSD_TRX='TKJYoAbbLMsZkC7bonqiyzNmqtGu1iD7in'
 USDJ_TRX='TQcia2H2TU3WrFk9sKtdK9qCfkW8XirfPQ'
 USDC_TRX='TXX1i3BWKBuTxUmTERCztGyxSSpRagEcjX'
 
-query_contract='TNveSRxR6qbmZAR2bXgF4wfdP6naV8wQhv'
+sunswap_pairs = ['BTT_USDT', 'SUN_USDT']
+
+BTT_USDT='TLKyq7eJ4YKbs3TGEvoBJWkAXWYQKWo2Nn'
+SUN_USDT='TTdeCobmYxhfFBYUZbiQqbZ56zrFkSE5DG'
+
+query_contract='TDEaNFKexhamB2Jkyze6j7fMrjxReekCkt'
 sun_stable_exchange='TKcEU8ekq2ZoFzLSGFYCUY6aocJBX9X31b'
 stable_exchange_contract='TGYZuDYCTpFKnikgbSwjftzR4HwFbF5Vxk'
 

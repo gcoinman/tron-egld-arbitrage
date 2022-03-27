@@ -135,17 +135,24 @@ class DexSwap(object):
     def update_information(self):
         asset_addrs = [eval(asset) for asset in assets[1:]]
         pairs = [eval(asset+'_TRX') for asset in assets[1:]]
-        (reserves, balances, sun_outs) = self.query.functions.get_all_information(self.from_addr, asset_addrs, pairs, 15000)
+        pairs1 = [eval(pair) for pair in sunswap_pairs]
+        (reserves, balances, sun_outs) = self.query.functions.get_all_information(self.from_addr, asset_addrs, pairs, pairs1, 10000)
         for i in range(len(assets)):
             self.balances[assets[i]] = balances[i]
         i = 0
         for asset in assets[1:]:
             self.reserves[asset+'_TRX'] = (reserves[i][0], reserves[i][1])
             i += 1
-        # self.stable_prices['USDJ_BUY'] = (10 ** 18 * 15000) / sun_outs[1]
-        self.stable_prices['TUSD_BUY'] = (10 ** 18 * 15000) / sun_outs[3]
-        # self.stable_prices['USDJ_SELL'] = sun_outs[0] / (10 ** 6 * 15000)
-        self.stable_prices['TUSD_SELL'] = sun_outs[2] / (10 ** 6 * 15000)
+        for pair in sunswap_pairs:
+            self.reserves[pair] = (reserves[i][0], reserves[i][1])
+            i += 1
+            
+        self.stable_prices['USDJ_BUY'] = (10 ** 18 * 10000) / sun_outs[1]
+        self.stable_prices['TUSD_BUY'] = (10 ** 18 * 10000) / sun_outs[3]
+        # self.stable_prices['USDC_BUY'] = (10 ** 6 * 10000) / sun_outs[5]
+        self.stable_prices['USDJ_SELL'] = sun_outs[0] / (10 ** 6 * 10000)
+        self.stable_prices['TUSD_SELL'] = sun_outs[2] / (10 ** 6 * 10000)
+        # self.stable_prices['USDC_SELL'] = sun_outs[4] / (10 ** 6 * 10000)
 
 
     def getOutputAmount(self, amountIn, tokenIn, tokenOut):
@@ -263,11 +270,11 @@ class DexSwap(object):
             amount_out = self.getOutputAmount(amount_in, base_asset, quote_asset)
             org_amount_out = amount_out
             amount_out = int(amount_out * slippage_numerator / slippage_senominator)
-            u_amount_in = int((amount_in / 10 ** 12) * self.stable_prices[base_asset+'_BUY'])
+            u_amount_in = int((amount_in / 10 ** 12) * self.stable_prices[base_asset+'_BUY'] * 1.001)
             print('sell stable coin {}, USDT amount in is {}'.format(base_asset, u_amount_in / 10 ** 6))
-            # if base_asset == 'USDJ':
-            #     jpair = USDJ_TRX
-            #     mid_coin_id = 0
+            if base_asset == 'USDJ':
+                jpair = USDJ_TRX
+                mid_coin_id = 0
             if base_asset == 'TUSD':
                 jpair = TUSD_TRX
                 mid_coin_id = 1
@@ -309,11 +316,11 @@ class DexSwap(object):
             amount_out = self.getOutputAmount(amount_in, quote_asset, base_asset)
             org_amount_out = amount_out
             amount_out = int(amount_out * slippage_numerator / slippage_senominator)
-            u_amount_out = int((amount_out / 10 ** 12) / self.stable_prices[base_asset + '_SELL'])
+            u_amount_out = int((amount_out / 10 ** 12) * self.stable_prices[base_asset + '_SELL'])
             print('buy stable coin {}, USDT amount out is {}'.format(base_asset, u_amount_out / 10 ** 6))
-            # if base_asset == 'USDJ':
-            #     jpair = USDJ_TRX
-            #     mid_coin_id = 0
+            if base_asset == 'USDJ':
+                jpair = USDJ_TRX
+                mid_coin_id = 0
             if base_asset == 'TUSD':
                 jpair = TUSD_TRX
                 mid_coin_id = 1
@@ -513,6 +520,10 @@ if __name__ == "__main__":
     dex_swap = DexSwap(log)
     # dex_swap.approve('USDC')
     print(dex_swap.precisions)
+    dex_swap.update_information()
+    print(dex_swap.balances)
+    print(dex_swap.reserves)
+    print(dex_swap.stable_prices)
     # dex_swap.stable_exchange_approve('USDJ', sun_stable_exchange)
     # dex_swap.stable_exchange_approve('TUSD', sun_stable_exchange)
     # dex_swap.stable_exchange_approve('USDT', sun_stable_exchange)

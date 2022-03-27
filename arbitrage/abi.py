@@ -1127,7 +1127,7 @@ justswap_abi='''
 
 
 query_abi = '''
-  [
+[
     {
       "inputs": [],
       "payable": false,
@@ -1150,6 +1150,11 @@ query_abi = '''
         {
           "internalType": "address[]",
           "name": "pair_list",
+          "type": "address[]"
+        },
+        {
+          "internalType": "address[]",
+          "name": "pair_list1",
           "type": "address[]"
         },
         {
@@ -1199,6 +1204,11 @@ query_abi = '''
           "internalType": "address",
           "name": "pool",
           "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "pool1",
+          "type": "address"
         }
       ],
       "name": "setStablePool",
@@ -1211,6 +1221,21 @@ query_abi = '''
       "constant": true,
       "inputs": [],
       "name": "stable_pool",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "stable_pool1",
       "outputs": [
         {
           "internalType": "address",

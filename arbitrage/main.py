@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor, wait
 from logger import Logger
 import func_timeout
 from func_timeout import func_set_timeout
+from arbitrage.erdsdk.tools.client import *
 
 def get_valid_depth(depths, symbol):
     if symbol not in depths:
@@ -276,8 +277,8 @@ def stable_asset_arbitrage():
         if trx_buy_price == 0:
             print('trx depth is none')
             return
-        # stable_assets = ['USDJ', 'TUSD']
-        stable_assets = ['TUSD']
+        stable_assets = ['USDJ', 'TUSD']
+        # stable_assets = ['TUSD']
         for asset in stable_assets:
             symbols = [asset, 'TRX']
             quote_buy_price, quote_buy_volume, quote_sell_price, quote_sell_volume = get_depth_volume_price(4, binance.depths, 'TRXUSDT')
@@ -292,8 +293,8 @@ def stable_asset_arbitrage():
                 return
             if asset in tasks:
                 continue
-            base_min_amount = 2000
-            quote_min_amount = 2000 / quote_buy_price
+            base_min_amount = 10000
+            quote_min_amount = 10000 / quote_buy_price
             dex_buy_price = dex_swap.get_price(symbols[0], symbols[1], 'buy', quote_min_amount * 10 ** dex_swap.precisions[symbols[1]])
             dex_sell_price = dex_swap.get_price(symbols[0], symbols[1], 'sell', base_min_amount * 10 ** dex_swap.precisions[symbols[0]])
             base_buy_price = dex_swap.stable_prices[asset+'_BUY']
@@ -343,26 +344,28 @@ def stable_asset_arbitrage():
     except Exception as e:
         print(e)
 
-# egld_swap = EgldSwap()
+egld_swap = EgldSwap()
 egld_total_profit = 0
+
+@func_set_timeout(600)
 def egld_asset_arbitrage():
     global egld_total_profit
     try:
-        egld_price_percent_difference_threshold = 0.004
+        egld_price_percent_difference_threshold = 0.0035
         dex_sell_price = egld_swap.get_price('sell')
         dex_buy_price = egld_swap.get_price('buy')
         cex_buy_price, cex_buy_volume, cex_sell_price, cex_sell_volume = get_depth_volume_price(4, binance.depths, 'EGLDUSDT')
-        # print(dex_sell_price, cex_buy_price, (dex_sell_price - cex_buy_price) / dex_sell_price)
-        # print(cex_sell_price, dex_buy_price, (cex_sell_price - dex_buy_price) / dex_buy_price)
         if cex_sell_price > dex_buy_price * (1 + egld_price_percent_difference_threshold):
+            egld_swap.update_esdt_token_balances()
             wegld_bal = egld_swap.asset_balance('WEGLD')
             usdc_bal = egld_swap.asset_balance('USDC')
             if usdc_bal > 5000:
                 usdc_bal = 5000
             if usdc_bal < 500:
+                print('\nUSDC balance is {:.4f}, to small'.format(usdc_bal))
                 return
             wegld_buy_amount = (usdc_bal / cex_buy_price) * 0.95
-            print('EGLD: cex sell amount is {:.4f}, cex sell price is {:.4f}, dex buy price is {:.4f}'.format(wegld_buy_amount, cex_sell_price, dex_buy_price))
+            print('\nEGLD: cex sell amount is {:.4f}, cex sell price is {:.4f}, dex buy price is {:.4f}'.format(wegld_buy_amount, cex_sell_price, dex_buy_price))
             ret, used_usdc_amount = egld_swap.buy(wegld_buy_amount, dex_buy_price)
             if not ret:
                 return
@@ -371,14 +374,19 @@ def egld_asset_arbitrage():
             egld_total_profit += profit
             print('EGLD：this arbitrage profit is {:.4f}, total profit is {:.4f}'.format(profit, egld_total_profit))
         elif cex_buy_price < dex_sell_price / (1 + egld_price_percent_difference_threshold):
+            egld_swap.update_esdt_token_balances()
             wegld_bal = egld_swap.asset_balance('WEGLD')
             usdc_bal = egld_swap.asset_balance('USDC')
+            if usdc_bal > 100000: 
+                print('USDC balance exceed!!!')
+                return
             if wegld_bal * dex_sell_price > 5000:
                 wegld_bal = 5000 / dex_sell_price
             if wegld_bal < 2:
+                print('\nWEGLD balance is {:.4f}, to small'.format(wegld_bal))
                 return
             wegld_sell_amount = wegld_bal * 0.95
-            print('EGLD: cex buy amount is {:.4f}, cex buy price is {:.4f}, dex buy price is {:.4f}'.format(wegld_sell_amount, cex_buy_price, dex_sell_price))
+            print('\nEGLD: cex buy amount is {:.4f}, cex buy price is {:.4f}, dex sell price is {:.4f}'.format(wegld_sell_amount, cex_buy_price, dex_sell_price))
             ret, get_usdc_amount = egld_swap.sell(wegld_sell_amount, dex_sell_price)
             if not ret:
                 return
@@ -397,15 +405,198 @@ def set_working_flag(status: str):
     with open(file_path, 'w') as f:
         f.write(status)
 
-def egld_work_thread():
+def wait_for_withdraw_complete(wid):
     while(True):
-        egld_asset_arbitrage()
-        time.sleep(3)
+        try:
+            print('\nwait for EGLD withdraw to dex complete, pending id:\n')
+            print(wid)
+            withdraw_list = binance.client.get_withdraw_history(status=2)
+            withdraw_list += binance.client.get_withdraw_history(status=4)
+            withdraw_list += binance.client.get_withdraw_history(status=6)
+            find_item = False
+            for item in withdraw_list:
+                if item['id'] != wid:
+                    continue
+                find_item = True
+                if 'txId' not in item:
+                    continue
+                txid = item['txId']
+                tx = get_transaction(txid)
+                tx_type = tx['type']
+                tx_status = tx['status']
+                if tx_type != 'normal' or tx_status != 'success':
+                    continue
+                print('{} withdraw succeed, amount={}, txid={}'.format(item['coin'], item['amount'], txid))
+                return True
+            if not find_item:
+                print('Cannot find EGLD withdraw ID!')
+   
+            withdraw_list = binance.client.get_withdraw_history(status=3)
+            withdraw_list += binance.client.get_withdraw_history(status=5)
+            print('get completed withdraw history')
+            for item in withdraw_list:
+                if item['id'] == wid:
+                    print('EGLD withdraw failed')
+                    return False
+        except Exception as e:
+            print('wait_for_withdraw_complete exception')
+            log.logger.info('wait_for_withdraw_complete exception: {}'.format(str(e)))
+        finally:
+            time.sleep(3)
+
+def wait_wrap_egld(amount):
+    while(True):
+        bal = egld_swap.get_egld_balance() - 10 ** 17
+        print('wait wrap egld is running')
+        if bal / 10 ** 18 > amount:
+            bal = bal - 10 ** 18
+            tx = egld_swap.wrap_egld(int(bal))
+            tx_type = tx['type']
+            tx_status = tx['status']
+            if tx_type == 'normal' and tx_status == 'success':
+                print(tx_type, tx_status)
+                print('wait wrap egld succeed')
+                return
+            else:
+                print('wait wrap egld failed')
+        time.sleep(10)
+
+def wait_unwrap_egld(amount):
+    while(True):
+        bal = egld_swap.get_egld_balance()
+        if bal / 10 ** 18 >= amount:
+            print('egld balance is {}, great than {}'.format(bal / 10 ** 18, amount))
+            return True
+        egld_swap.update_esdt_token_balances()
+        wegld_bal = egld_swap.asset_balance('WEGLD')
+        if wegld_bal <= amount:
+            print('wait unwrap egld failed, wegld balance is {}, unwrap amount is {}'.format(wegld_bal, amount))
+            return False
+        print('wait unwrap egld is running')
+        tx = egld_swap.unwrap_egld(int(amount * 10 ** 18))
+        tx_type = tx['type']
+        tx_status = tx['status']
+        if tx_type == 'normal' and tx_status == 'success':
+            print(tx_type, tx_status)
+            print('wait unwrap egld succeed')
+            while(True):
+                bal = egld_swap.get_egld_balance()
+                if bal / 10 ** 18 >= amount:
+                    print('wait unwrap egld succeed, balance right')
+                    return True
+                time.sleep(3)
+        else:
+            print('wait unwrap egld failed')
+        time.sleep(10)
+
+def wait_for_deposit_complete(txid):
+    while(True):
+        try:
+            print('\nwait for EGLD deposit to cex complete, pending txid:\n')
+            print(txid)
+            deposit_list = binance.client.get_deposit_history(status=1)
+            for item in deposit_list:
+                if item['txId'] == txid:
+                    print('{} deposit succeed, amount is {}'.format(item['coin'], item['amount']))
+                    return
+        finally:
+            time.sleep(3)
+
+def get_asset_info(**params):
+    return binance.client._request_margin_api('get', 'capital/config/getall', True, data=params)
+
+def is_withdraw_enable(assets_info):
+    for asset_info in assets_info:
+        if asset_info['coin'].upper() == 'EGLD':
+            for network in asset_info['networkList']:
+                if network['network'] == 'EGLD':
+                    return network['withdrawEnable']
+    return False
+
+def is_deposit_enable(assets_info):
+    for asset_info in assets_info:
+        if asset_info['coin'].upper() == 'EGLD':
+            for network in asset_info['networkList']:
+                if network['network'] == 'EGLD':
+                    return network['depositEnable']
+    return False
+
+def repay_egld():
+    response = binance.client.get_margin_account()
+    margin_balances = response['userAssets']
+    for asset_info in margin_balances:
+        if asset_info['asset'] == 'EGLD':
+            free = float(asset_info['free'])
+            borrowed = float(asset_info['borrowed'])
+            if free > borrowed and borrowed > 1:
+                binance.client.repay_margin_loan(
+                    asset='EGLD',
+                    amount=borrowed)
+            elif free < borrowed and free > 50:
+                binance.client.repay_margin_loan(
+                    asset='EGLD',
+                    amount=free - 40)
+
+
+def check_egld_balance():
+    while(True):
+        try:
+            repay_egld()
+            assets_info = get_asset_info(timestamp = int(time.time() * 1000))
+            egld_swap.update_esdt_token_balances()
+            wegld_bal = egld_swap.asset_balance('WEGLD')
+            withdraw_amount = 200
+            if wegld_bal < 150 and is_withdraw_enable(assets_info):
+                print('EGLD withdraw to dex wallet, dex egld balance is {}'.format(wegld_bal))
+                binance.client.transfer_margin_to_spot(
+                        asset='EGLD',
+                        amount=withdraw_amount)
+                time.sleep(1)
+                resp = binance.client.withdraw(
+                    coin='EGLD',
+                    address='erd1gx76al98vt25tvndwemr6z34zv94xaj44le7a4zmzzr69mpzp8gsv3m403',
+                    amount=withdraw_amount,
+                    network='EGLD')
+                if(wait_for_withdraw_complete(resp['id'])):
+                    wait_wrap_egld(withdraw_amount)
+                    time.sleep(10)
+            
+            if wegld_bal > 900 and is_deposit_enable(assets_info):
+                deposit_amount = wegld_bal - 800
+                print('EGLD deposit to cex amount is {}'.format(deposit_amount))
+                if not wait_unwrap_egld(deposit_amount):
+                    time.sleep(5)
+                    continue
+                deposit_amount = egld_swap.get_egld_balance() - 10 ** 18
+                txid = egld_swap.transfer_2_cex(int(deposit_amount))
+                if txid is None:
+                    time.sleep(10)
+                    continue
+                wait_for_deposit_complete(txid)
+        except func_timeout.exceptions.FunctionTimedOut:
+            print('check_egld_balance time out')
+        except Exception as e:
+            print(e)
+        finally:
+            time.sleep(20)
+
+def egld_work_thread():
+    t = threading.Thread(target=check_egld_balance)
+    t.start()
+    while(True):
+        try:
+            egld_asset_arbitrage()
+            binance.update_margin_balances_obj()
+        except Exception as e:
+            print(e)
+        except func_timeout.exceptions.FunctionTimedOut:
+            print('egld_asset_arbitrage time out')
+        time.sleep(1)
 
 def main():
     binance.start_update_depth()
-    # t = threading.Thread(target=egld_work_thread)
-    # t.start()
+    #t = threading.Thread(target=egld_work_thread)
+    #t.start()
     while True:
         try:
             dex_swap.check_status()

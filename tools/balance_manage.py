@@ -126,8 +126,8 @@ def get_price(asset):
         if ticker['symbol'] == (asset + 'USDT'):
             return float(ticker['price'])
 
-wbtt_addr = 'TKfjV9RNKJJCqPvBtK8L7Knykh7DNWvnYt'
-btt_token_id = 1002000
+# wbtt_addr = 'TKfjV9RNKJJCqPvBtK8L7Knykh7DNWvnYt'
+# btt_token_id = 1002000
 
 wallet_assets_max_limit = {'TRX': 600000, 'USDT': 20000, 'BTT': 3500000, 'JST': 80000, 'WIN': 16000000, 'SUN': 500000}
 
@@ -178,34 +178,34 @@ def transfer2cex():
                 dex_swap.update_information()
 
 #######################################################
-    time.sleep(1)
-    asset = 'BTT'
-    if not is_deposit_enable(assets_info, asset):
-        return
-    price = get_price(asset)
-    dex_free = dex_swap.balances[asset]
-    if dex_free / 10 ** dex_swap.precisions[asset] < wallet_assets_max_limit[asset]:
-        return
-    amount = dex_free / 10 ** dex_swap.precisions[asset] - wallet_assets_max_limit[asset]
-    if amount * price < 1000:
-        return
-    print('{} transfer to cex, amount is {:.4f}'.format(asset, amount))
-    amount = int(amount * 10 ** dex_swap.precisions[asset])
-    try:
-        dex_swap.withdraw_btt(amount)
-        btt_bal = dex_swap.get_btt_balance()
-        if btt_bal / 10 ** 6 * price < 1000:
-            print('btt balance is {}, too small'.format(btt_bal / 10 ** 6))
-            return
-        txid = dex_swap.transfer_btt(cex_wallet, btt_bal)
-        withdrow_dex_ids.append(txid)
-        print(txid)
-    except func_timeout.exceptions.FunctionTimedOut:
-        print('btt transfer time out')
-        i -= 1
-    except Exception as e:
-        print('btt transfer exception')
-        time.sleep(1)
+    # time.sleep(1)
+    # asset = 'BTT'
+    # if not is_deposit_enable(assets_info, asset):
+    #     return
+    # price = get_price(asset)
+    # dex_free = dex_swap.balances[asset]
+    # if dex_free / 10 ** dex_swap.precisions[asset] < wallet_assets_max_limit[asset]:
+    #     return
+    # amount = dex_free / 10 ** dex_swap.precisions[asset] - wallet_assets_max_limit[asset]
+    # if amount * price < 1000:
+    #     return
+    # print('{} transfer to cex, amount is {:.4f}'.format(asset, amount))
+    # amount = int(amount * 10 ** dex_swap.precisions[asset])
+    # try:
+    #     dex_swap.withdraw_btt(amount)
+    #     btt_bal = dex_swap.get_btt_balance()
+    #     if btt_bal / 10 ** 6 * price < 1000:
+    #         print('btt balance is {}, too small'.format(btt_bal / 10 ** 6))
+    #         return
+    #     txid = dex_swap.transfer_btt(cex_wallet, btt_bal)
+    #     withdrow_dex_ids.append(txid)
+    #     print(txid)
+    # except func_timeout.exceptions.FunctionTimedOut:
+    #     print('btt transfer time out')
+    #     i -= 1
+    # except Exception as e:
+    #     print('btt transfer exception')
+    #     time.sleep(1)
 # #######################################################
 
 withdrow_cex_ids = []
@@ -237,7 +237,8 @@ def transfer2dex():
     spot_balances = get_spot_balances()
     dex_swap.update_information()
     assets_info = get_asset_info(timestamp = int(time.time() * 1000))
-    tmp_trx_assets = trx_assets + ['BTT']
+    # tmp_trx_assets = trx_assets + ['BTT']
+    tmp_trx_assets = trx_assets
     try:
         for asset in tmp_trx_assets:
             if not is_withdraw_enable(assets_info, asset):
@@ -363,11 +364,11 @@ def wait_for_withdraw_complete():
         time.sleep(3)
 
     ##################################
-    btt_bal = dex_swap.get_btt_balance()
-    if btt_bal / 10 ** 6 >  50000:
-        print('btt balance is {:.2f}, deposit to wbtt'.format(btt_bal / 10 ** 6))
-        dex_swap.deposit_btt(btt_bal)
-        return
+    # btt_bal = dex_swap.get_btt_balance()
+    # if btt_bal / 10 ** 6 >  50000:
+    #     print('btt balance is {:.2f}, deposit to wbtt'.format(btt_bal / 10 ** 6))
+    #     dex_swap.deposit_btt(btt_bal)
+    #     return
     ##################################
 
 def is_withdraw_enable(assets_info, asset):

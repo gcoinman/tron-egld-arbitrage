@@ -48,3 +48,4 @@ flag
 arbitrage/key.py
 arbitrage/wallets
 arbitrage/erdsdk
+tools/wallets

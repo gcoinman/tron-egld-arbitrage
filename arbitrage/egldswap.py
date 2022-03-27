@@ -34,8 +34,11 @@ class EgldSwap(object):
 
     def update_esdt_token_balances(self):
         balances = proxy_get_account_esdt_balance(self.account)
-        self.balances['WEGLD'] = int(balances[token_ids['WEGLD']]['balance'])
-        self.balances['USDC'] = int(balances[token_ids['USDC']]['balance'])
+        self.balances['WEGLD'] = int(balances[token_ids['WEGLD']]['balance']) if token_ids['WEGLD'] in balances else 0
+        self.balances['USDC'] = int(balances[token_ids['USDC']]['balance']) if token_ids['USDC'] in balances else 0
+
+    def get_egld_balance(self):
+        return proxy_get_account_balance(self.account)
 
     def get_amount_out(self, token_in, amount):
         pair_address = USDC_EGLD
@@ -59,22 +62,23 @@ class EgldSwap(object):
             resp_obj = swap(self.account, token_ids['WEGLD'], amount_in, token_ids['USDC'], token_out_min_amount = min_amount_out)
             if resp_obj['type'] != 'normal' or resp_obj['status'] != 'success':
                 succeed = False
-                print('sell failed')
-                print(ret)
-                return
+                print('dex sell failed')
+                print(resp_obj)
+                return False, 0
             contract_result = resp_obj['smartContractResults'][0]
             if 'returnMessage' in contract_result:
                 succeed = False
-                print('sell failed')
+                print('dex sell failed')
                 print(contract_result['returnMessage'])
-                return
+                return False, 0
             print('dex sell wgld success: sell wegld={:.4f}, get usdc={:.4f}'.format(wegld_amount, wegld_amount * price * 0.999))
             succeed = True
         except Exception as e:
             print('dex sell fail: {}'.format(str(e)))
             succeed = False
         finally:
-            return succeed, min_amount_out
+            self.update_esdt_token_balances()
+            return succeed, min_amount_out / 10 ** self.precisions['USDC']
             
     # @func_set_timeout(28)
     def buy(self, wegld_amount, price):
@@ -85,22 +89,23 @@ class EgldSwap(object):
             resp_obj = swap(self.account, token_ids['USDC'], amount_in, token_ids['WEGLD'], token_out_min_amount = min_amount_out)
             if resp_obj['type'] != 'normal' or resp_obj['status'] != 'success':
                 succeed = False
-                print('buy failed')
-                print(ret)
-                return
+                print('dex buy failed')
+                print(resp_obj)
+                return False, 0
             contract_result = resp_obj['smartContractResults'][0]
             if 'returnMessage' in contract_result:
                 succeed = False
-                print('buy failed')
+                print('dex buy failed')
                 print(contract_result['returnMessage'])
-                return
+                return False, 0
             print('dex buy wgld success: buy wegld={:.4f}, used usdc={:.4f}'.format(wegld_amount, wegld_amount * price * 1.001))
             succeed = True
         except Exception as e:
             print('dex buy fail: {}'.format(str(e)))
             succeed = False
         finally:
-            return succeed, amount_in
+            self.update_esdt_token_balances()
+            return succeed, amount_in / 10 ** self.precisions['USDC']
     
     def show_account_all_balance(self):
         self.update_esdt_token_balances()
@@ -113,19 +118,43 @@ class EgldSwap(object):
         print('total value: {:.1f} USDT'.format(total))
 
     def transfer_2_cex(self, amount):
-        send_platform_token(self.account, 'erd1gqq3y40vq95dmahcgttz9hdwru4tjl8eflyaz4gx0ph27yaz4e6s6pve8c', amount)
+        cex_wallet = 'erd1gqq3y40vq95dmahcgttz9hdwru4tjl8eflyaz4gx0ph27yaz4e6s6pve8c'
+        print('deposit cex adddress is {}'.format(cex_wallet))
+        ret = send_platform_token(self.account, cex_wallet, amount)
+        print(ret)
+        return ret['hash']
 
     def wrap_egld(self, amount):
-        wrap_egld(self.account, amount)
+        ret = wrap_egld(self.account, amount)
+        print(ret)
+        return ret
+
+    def unwrap_egld(self, amount):
+        ret = unwrap_egld(self.account, amount)
+        print(ret)
+        return ret 
 
 if __name__ == "__main__":
     egld_swap = EgldSwap()
-    # egld_swap.wrap_egld(int(3 * 10 ** 18))
+    # tx = get_transaction('0ec6ae184fbca66773af91f3aa7f49e3ac0d8c1216d376ad1bc3476fe7f90a42')
+    # print(tx)
+    # tx_type = tx['type']
+    # tx_status = tx['status']
+    # if tx_type == 'normal' and tx_status == 'success':
+    #     print(tx_type, tx_status)
+    # print(egld_swap.get_egld_balance())
+    tx = egld_swap.wrap_egld(int(0.1 * 10 ** 18))
+    tx_type = tx['type']
+    tx_status = tx['status']
+    if tx_type == 'normal' and tx_status == 'success':
+        print(tx_type, tx_status)
+    else:
+        print('failed')
     # egld_swap.show_account_all_balance()
     # egld_swap.transfer_2_cex(int(0.01 * 10 ** 18))
-    price_sell = egld_swap.get_price('sell')
+    # price_sell = egld_swap.get_price('sell')
     # print(price_sell)
-    egld_swap.sell(0.001, price_sell * 1.1)
+    # egld_swap.sell(0.001, price_sell * 1.1)
     # egld_swap.update_esdt_token_balances()
     # get_pair_address()
     # egld_swap.get_amount_out('USDC', 10 ** 6)
